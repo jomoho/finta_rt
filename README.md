@@ -1,4 +1,4 @@
-# FinTA (Financial Technical Analysis)
+# Realtime (RT) FORK of FinTA (Financial Technical Analysis)
 
 [![License: LGPL v3](https://img.shields.io/badge/License-LGPL%20v3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
 [![PyPI](https://img.shields.io/pypi/v/finta.svg?style=flat-square)](https://pypi.python.org/pypi/finta/)
@@ -14,6 +14,29 @@ Common financial technical indicators implemented in Pandas.
 
 *This is work in progress, bugs are expected and results of some indicators
 may not be accurate.*
+
+## About Realtime
+To be able use finta in a realtime scenario (recalculating features for a small time window on an ongoing basis), I neeeded to adjust some of the Indicators to take an init value, otherwise Indicators with a long 'memory' will have erroneous output.
+Long memory occurs in indicators based on .cumsum() and .ewm()
+
+I adjusted the following indicators:
+
+* EMA
+* SMMA
+* MACD
+* PPO
+* EV_MACD
+* RSI
+* DMI
+* ADX
+* STOCHRSI
+* ADL
+* CHAIKIN
+* OBV
+* VZO
+
+
+I also set .ewm() parameter adjust to False in all of these cases.
 
 ## Supported indicators:
 
