@@ -4,18 +4,18 @@ import numpy as np
 from pandas import DataFrame, Series
 
 
-def ewma(data: pd.Series, span: int = None, alpha: float = None, min_periods=0, adjust=False, init: float = None):
+def ewma(data: pd.Series, span: int = None, alpha: float = None, ignore_na=True, min_periods=0, adjust=False, init: float = None):
     if span != None:
         alpha = 2 / float(span + 1)
     if init != None:
         tmp = data.values[0]
         data.values[0] = init
-        res = data.ewm(alpha=alpha, adjust=adjust,
+        res = data.ewm(alpha=alpha, adjust=adjust, ignore_na=ignore_na,
                        min_periods=min_periods).mean()
         data.values[0] = tmp
         return res
     else:
-        return data.ewm(alpha=alpha, adjust=adjust).mean()
+        return data.ewm(alpha=alpha, adjust=adjust, ignore_na=ignore_na,).mean()
 
 
 def cumsum(data: pd.Series, init: float = None):
@@ -1346,17 +1346,20 @@ class TA:
         return pd.Series(fast - slow, name="AO")
 
     @classmethod
-    def MI(cls, ohlc: DataFrame, period: int = 9, adjust: bool = False) -> Series:
+    def MI(cls, ohlc: DataFrame, period: int = 9, adjust: bool = False, init: dict = None) -> Series:
         """Developed by Donald Dorsey, the Mass Index uses the high-low range to identify trend reversals based on range expansions.
         In this sense, the Mass Index is a volatility indicator that does not have a directional bias.
         Instead, the Mass Index identifies range bulges that can foreshadow a reversal of the current trend."""
 
         _range = pd.Series(ohlc["high"] - ohlc["low"], name="range")
-        EMA9 = _range.ewm(span=period, ignore_na=False, adjust=adjust).mean()
-        DEMA9 = EMA9.ewm(span=period, ignore_na=False, adjust=adjust).mean()
-        mass = EMA9 / DEMA9
+        EMA = pd.Series(ewma(_range, span=period, ignore_na=False,
+                             adjust=adjust, init=get_init(init, 'EMA')), name='EMA')
+        DEMA = pd.Series(ewma(EMA, span=period, ignore_na=False,
+                              adjust=adjust, init=get_init(init, 'DEMA')), name='DEMA')
+        mass = (EMA / DEMA)
 
-        return pd.Series(mass.rolling(window=25).sum(), name="Mass Index")
+        MI = pd.Series(mass.rolling(window=25).sum(), name="MI")
+        return pd.concat([MI, EMA, DEMA], axis=1)
 
     @classmethod
     def BOP(cls, ohlc: DataFrame) -> Series:
@@ -1639,6 +1642,7 @@ class TA:
         period: int = 13,
         column: str = "close",
         adjust: bool = False,
+        init: float = None
     ) -> Series:
         """Elder's Force Index is an indicator that uses price and volume to assess the power
          behind a move or identify possible turning points."""
@@ -1646,7 +1650,7 @@ class TA:
         # https://tradingsim.com/blog/elders-force-index/
         fi = pd.Series(ohlcv[column].diff() * ohlcv["volume"])
         return pd.Series(
-            fi.ewm(ignore_na=False, span=period, adjust=adjust).mean(),
+            ewma(fi, ignore_na=False, span=period, adjust=adjust, init=init),
             name="{0} period Force Index".format(period),
         )
 
@@ -2112,6 +2116,7 @@ class TA:
         factor: int = 0.2,
         vfactor: int = 2.5,
         adjust: bool = False,
+        init: float = None
     ) -> Series:
         """
         This indicator tracks volume based on the direction of price
@@ -2169,12 +2174,13 @@ class TA:
         raw_value = raw_sum / mav.shift()
 
         vfi = pd.Series(
-            raw_value.ewm(
-                ignore_na=False,
-                min_periods=smoothing_factor - 1,
-                span=smoothing_factor,
-                adjust=adjust,
-            ).mean(),
+            ewma(raw_value,
+                 # ignore_na=False,
+                 min_periods=smoothing_factor - 1,
+                 span=smoothing_factor,
+                 adjust=adjust,
+                 init=init
+                 ),
             name="VFI",
         )
 
