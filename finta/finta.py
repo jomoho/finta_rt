@@ -4,18 +4,18 @@ import numpy as np
 from pandas import DataFrame, Series
 
 
-def ewma(data: pd.Series, span: int = None, alpha: float = None, min_periods=0, init: float = None):
+def ewma(data: pd.Series, span: int = None, alpha: float = None, min_periods=0, adjust=False, init: float = None):
     if span != None:
         alpha = 2 / float(span + 1)
     if init != None:
         tmp = data.values[0]
         data.values[0] = init
-        res = data.ewm(alpha=alpha, adjust=False,
+        res = data.ewm(alpha=alpha, adjust=adjust,
                        min_periods=min_periods).mean()
         data.values[0] = tmp
         return res
     else:
-        return data.ewm(alpha=alpha, adjust=False).mean()
+        return data.ewm(alpha=alpha, adjust=adjust).mean()
 
 
 def cumsum(data: pd.Series, init: float = None):
@@ -121,7 +121,7 @@ class TA:
         ohlc: DataFrame,
         period: int = 9,
         column: str = "close",
-        adjust: bool = True,
+        adjust: bool = False,
     ) -> Series:
         """
         Smoothed simple moving average.
@@ -162,7 +162,7 @@ class TA:
         ohlc: DataFrame,
         period: int = 9,
         column: str = "close",
-        adjust: bool = True,
+        adjust: bool = False,
     ) -> Series:
         """
         Double Exponential Moving Average - attempts to remove the inherent lag associated to Moving Averages
@@ -181,7 +181,7 @@ class TA:
         return pd.Series(DEMA, name="{0} period DEMA".format(period))
 
     @classmethod
-    def TEMA(cls, ohlc: DataFrame, period: int = 9, adjust: bool = True) -> Series:
+    def TEMA(cls, ohlc: DataFrame, period: int = 9, adjust: bool = False) -> Series:
         """
         Triple exponential moving average - attempts to remove the inherent lag associated to Moving Averages by placing more weight on recent values.
         The name suggests this is achieved by applying a triple exponential smoothing which is not the case. The name triple comes from the fact that the
@@ -228,7 +228,7 @@ class TA:
         ohlc: DataFrame,
         period: int = 20,
         column: str = "close",
-        adjust: bool = True,
+        adjust: bool = False,
     ) -> Series:
         """
         The TRIX indicator calculates the rate of change of a triple exponential moving average.
@@ -345,7 +345,7 @@ class TA:
         cls,
         ohlc: DataFrame,
         period: int = 26,
-        adjust: bool = True,
+        adjust: bool = False,
         column: str = "close",
     ) -> Series:
         """ZLEMA is an abbreviation of Zero Lag Exponential Moving Average. It was developed by John Ehlers and Rick Way.
@@ -612,7 +612,7 @@ class TA:
         period_slow: int = 26,
         signal: int = 9,
         column: str = "close",
-        adjust: bool = True,
+        adjust: bool = False,
     ) -> DataFrame:
         """"Volume-Weighted MACD" is an indicator that shows how a volume-weighted moving average can be used to calculate moving average convergence/divergence (MACD).
         This technique was first used by Buff Dormeier, CMT, and has been written about since at least 2002."""
@@ -790,7 +790,7 @@ class TA:
 
     @classmethod
     def DYMI(
-        cls, ohlc: DataFrame, column: str = "close", adjust: bool = True
+        cls, ohlc: DataFrame, column: str = "close", adjust: bool = False
     ) -> Series:
         """
         The Dynamic Momentum Index is a variable term RSI. The RSI term varies from 3 to 30. The variable
@@ -1346,7 +1346,7 @@ class TA:
         return pd.Series(fast - slow, name="AO")
 
     @classmethod
-    def MI(cls, ohlc: DataFrame, period: int = 9, adjust: bool = True) -> Series:
+    def MI(cls, ohlc: DataFrame, period: int = 9, adjust: bool = False) -> Series:
         """Developed by Donald Dorsey, the Mass Index uses the high-low range to identify trend reversals based on range expansions.
         In this sense, the Mass Index is a volatility indicator that does not have a directional bias.
         Instead, the Mass Index identifies range bulges that can foreshadow a reversal of the current trend."""
@@ -1414,43 +1414,46 @@ class TA:
         short: int = 13,
         signal: int = 13,
         column: str = "close",
-        adjust: bool = True,
+        adjust: bool = False,
+        init: dict = None,
     ) -> DataFrame:
         """True Strength Index (TSI) is a momentum oscillator based on a double smoothing of price changes."""
 
         # Double smoother price change
         momentum = pd.Series(ohlc[column].diff())  # 1 period momentum
-        _EMA25 = pd.Series(
-            momentum.ewm(span=long, min_periods=long -
-                         1, adjust=adjust).mean(),
-            name="_price change EMA25",
+        EMA_long = pd.Series(
+            ewma(momentum, span=long, min_periods=long -
+                 1, adjust=adjust, init=get_init(init, 'EMA_long')),
+            name="EMA_long",
         )
-        _DEMA13 = pd.Series(
-            _EMA25.ewm(span=short, min_periods=short -
-                       1, adjust=adjust).mean(),
-            name="_price change double smoothed DEMA13",
+        DEMA_short = pd.Series(
+            ewma(EMA_long, span=short, min_periods=short -
+                 1, adjust=adjust, init=get_init(init, 'DEMA_short')),
+            name="DEMA_short",
         )
 
         # Double smoothed absolute price change
         absmomentum = pd.Series(ohlc[column].diff().abs())
-        _aEMA25 = pd.Series(
-            absmomentum.ewm(span=long, min_periods=long -
-                            1, adjust=adjust).mean(),
-            name="_abs_price_change EMA25",
+        aEMA_long = pd.Series(
+            ewma(absmomentum, span=long, min_periods=long -
+                 1, adjust=adjust, init=get_init(init, 'aEMA_long')),
+            name="aEMA_long",
         )
-        _aDEMA13 = pd.Series(
-            _aEMA25.ewm(span=short, min_periods=short -
-                        1, adjust=adjust).mean(),
-            name="_abs_price_change double smoothed DEMA13",
-        )
-
-        TSI = pd.Series((_DEMA13 / _aDEMA13) * 100, name="TSI")
-        signal = pd.Series(
-            TSI.ewm(span=signal, min_periods=signal - 1, adjust=adjust).mean(),
-            name="signal",
+        # _abs_price_change double smoothed DEMA13
+        aDEMA_short = pd.Series(
+            ewma(aEMA_long, span=short, min_periods=short -
+                 1, adjust=adjust, init=get_init(init, 'aDEMA_short')),
+            name="aDEMA_short",
         )
 
-        return pd.concat([TSI, signal], axis=1)
+        TSI = pd.Series((DEMA_short / aDEMA_short) * 100, name="TSI")
+        SIGNAL = pd.Series(
+            ewma(TSI, span=signal, min_periods=signal - 1,
+                 adjust=adjust, init=get_init(init, 'SIGNAL')),
+            name="SIGNAL",
+        )
+
+        return pd.concat([TSI, SIGNAL, EMA_long, DEMA_short,  aEMA_long,  aDEMA_short], axis=1)
 
     @classmethod
     def TP(cls, ohlc: DataFrame) -> Series:
@@ -1635,7 +1638,7 @@ class TA:
         ohlcv: DataFrame,
         period: int = 13,
         column: str = "close",
-        adjust: bool = True,
+        adjust: bool = False,
     ) -> Series:
         """Elder's Force Index is an indicator that uses price and volume to assess the power
          behind a move or identify possible turning points."""
@@ -1650,7 +1653,7 @@ class TA:
     @classmethod
     @inputvalidator(input_="ohlcv")
     def CFI(
-        cls, ohlcv: DataFrame, column: str = "close", adjust: bool = True
+        cls, ohlcv: DataFrame, column: str = "close", adjust: bool = False
     ) -> Series:
         """
         Cummulative Force Index.
@@ -1724,7 +1727,7 @@ class TA:
         )
 
     @classmethod
-    def COPP(cls, ohlc: DataFrame, adjust: bool = True) -> Series:
+    def COPP(cls, ohlc: DataFrame, adjust: bool = False) -> Series:
         """The Coppock Curve is a momentum indicator, it signals buying opportunities when the indicator moved from negative territory to positive territory."""
 
         roc1 = cls.ROC(ohlc, 14)
@@ -1736,7 +1739,7 @@ class TA:
         )
 
     @classmethod
-    def BASP(cls, ohlc: DataFrame, period: int = 40, adjust: bool = True) -> DataFrame:
+    def BASP(cls, ohlc: DataFrame, period: int = 40, adjust: bool = False) -> DataFrame:
         """BASP indicator serves to identify buying and selling pressure."""
 
         sp = ohlc["high"] - ohlc["close"]
@@ -1756,7 +1759,7 @@ class TA:
         return pd.concat([nbfraw, nsfraw], axis=1)
 
     @classmethod
-    def BASPN(cls, ohlc: DataFrame, period: int = 40, adjust: bool = True) -> DataFrame:
+    def BASPN(cls, ohlc: DataFrame, period: int = 40, adjust: bool = False) -> DataFrame:
         """
         Normalized BASP indicator
         """
@@ -1786,7 +1789,7 @@ class TA:
         period: int = 9,
         factor: int = 100,
         column: str = "close",
-        adjust: bool = True,
+        adjust: bool = False,
     ) -> DataFrame:
         """
         Chande Momentum Oscillator (CMO) - technical momentum indicator invented by the technical analyst Tushar Chande.
@@ -1878,7 +1881,7 @@ class TA:
         ohlc: DataFrame,
         channel_lenght: int = 10,
         average_lenght: int = 21,
-        adjust: bool = True,
+        adjust: bool = False,
     ) -> DataFrame:
         """
         Wave Trend Oscillator
@@ -1899,7 +1902,7 @@ class TA:
         return pd.concat([wt1, wt2], axis=1)
 
     @classmethod
-    def FISH(cls, ohlc: DataFrame, period: int = 10, adjust: bool = True) -> Series:
+    def FISH(cls, ohlc: DataFrame, period: int = 10, adjust: bool = False) -> Series:
         """
         Fisher Transform was presented by John Ehlers. It assumes that price distributions behave like square waves.
         """
@@ -1986,7 +1989,7 @@ class TA:
         period: int = 21,
         dev_factor: int = 2,
         MA: Series = None,
-        adjust: bool = True,
+        adjust: bool = False,
     ) -> DataFrame:
         """
         The adaptive price zone (APZ) is a technical indicator developed by Lee Leibfarth.
@@ -2108,7 +2111,7 @@ class TA:
         smoothing_factor: int = 3,
         factor: int = 0.2,
         vfactor: int = 2.5,
-        adjust: bool = True,
+        adjust: bool = False,
     ) -> Series:
         """
         This indicator tracks volume based on the direction of price
@@ -2204,7 +2207,7 @@ class TA:
         k_period: int = 10,
         d_period: int = 3,
         column: str = "close",
-        adjust: bool = True
+        adjust: bool = False
     ) -> Series:
         """
         The Schaff Trend Cycle (Oscillator) can be viewed as Double Smoothed
@@ -2262,7 +2265,7 @@ class TA:
         period_slow: int = 30,
         k_period: int = 10,
         d_period: int = 3,
-        adjust: bool = True
+        adjust: bool = False
     ) -> Series:
         """Modification of Schaff Trend Cycle using EVWMA MACD for calculation"""
 
