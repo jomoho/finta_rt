@@ -1574,6 +1574,7 @@ class TA:
         return wobv.cumsum()
 
     @classmethod
+    @inputvalidator(input_="ohlcv")
     def VZO(
         cls,
         ohlc: DataFrame,
@@ -1613,7 +1614,7 @@ class TA:
         then the closing price will have a positive value (bullish); otherwise it will have a negative value (bearish).
         source: http://traders.com/Documentation/FEEDbk_docs/2011/06/Khalil.html
 
-        :period: Specifies the number of Periods used for eVWMA calculation
+        :period: Specifies the number of Periods used for PZO calculation
         """
 
         def sign(a): return (a > 0) - (a < 0)
