@@ -19,7 +19,7 @@ def ewma(data: pd.Series, span: int = None, alpha: float = None, ignore_na=True,
 
 
 def cumsum(data: pd.Series, init: float = None):
-    print(init)
+    # print(init)
     if init != None:
         tmp = data.values[0]
         data.values[0] = init
