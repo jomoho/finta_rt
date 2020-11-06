@@ -990,7 +990,7 @@ class TA:
          Pass desired moving average as <MA> argument. For example BBANDS(MA=TA.KAMA(20)).
          """
 
-        std = ohlc[column].rolling(window=period).std()
+        std = ohlc[column].rolling(center=False, window=period).std()
 
         if not isinstance(MA, pd.core.series.Series):
             middle_band = pd.Series(cls.SMA(ohlc, period), name="BB_MIDDLE")
@@ -1386,8 +1386,8 @@ class TA:
         VMMx = VMM.rolling(window=period).sum()
         TR = cls.TR(ohlc).rolling(window=period).sum()
 
-        VIp = pd.Series(VMPx / TR, name="VIp").interpolate(method="index")
-        VIm = pd.Series(VMMx / TR, name="VIm").interpolate(method="index")
+        VIp = pd.Series(VMPx / TR, name="VIp").interpolate(method="ffill")
+        VIm = pd.Series(VMMx / TR, name="VIm").interpolate(method="ffill")
 
         return pd.concat([VIm, VIp], axis=1)
 
