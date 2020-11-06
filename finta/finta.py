@@ -1387,9 +1387,9 @@ class TA:
         TR = cls.TR(ohlc).rolling(window=period).sum()
 
         VIp = pd.Series(
-            VMPx / TR, name="VIp").interpolate(method="pad", limit=5)
+            VMPx / TR, name="VIp").fillna(method='ffill')
         VIm = pd.Series(
-            VMMx / TR, name="VIm").interpolate(method="pad", limit=5)
+            VMMx / TR, name="VIm").fillna(method='ffill')
 
         return pd.concat([VIm, VIp], axis=1)
 
