@@ -1386,8 +1386,10 @@ class TA:
         VMMx = VMM.rolling(window=period).sum()
         TR = cls.TR(ohlc).rolling(window=period).sum()
 
-        VIp = pd.Series(VMPx / TR, name="VIp").interpolate(method="ffill")
-        VIm = pd.Series(VMMx / TR, name="VIm").interpolate(method="ffill")
+        VIp = pd.Series(
+            VMPx / TR, name="VIp").interpolate(method="pad", limit=5)
+        VIm = pd.Series(
+            VMMx / TR, name="VIm").interpolate(method="pad", limit=5)
 
         return pd.concat([VIm, VIp], axis=1)
 
